@@ -1,0 +1,59 @@
+{
+  "title": "Auth0 Authorisation to S3",
+  "name": "auth0-authorisation-to-s3",
+  "version": "1.1.0",
+  "author": "traveloka",
+  "description": "This extension will take Auth0 authorisation defined in authorisation extension and export them to S3",
+  "type": "cron",
+  "repository": "https://github.com/traveloka/auth0-authorization-exporter",
+  "keywords": [
+    "auth0",
+    "extension"
+  ],
+  "schedule": "0 0 2 ? * SUN",
+  "auth0": {
+    "scopes": "read:clients read:users"
+  },
+  "secrets": {
+    "AUTH0_DOMAIN": {
+      "description": "Auth0 domain",
+      "required": true
+    },
+    "AUTH0_CLIENT_ID": {
+      "description": "Auth0 non interactive client id that has read:clients read:users scope",
+      "required": true
+    },
+    "AUTH0_CLIENT_SECRET": {
+      "description": "Auth0 non interactive client secret",
+      "required": true
+    },
+    "AUTHORISATION_EXTENSION_API_URL": {
+      "description": "Auth0 authorisation extension API",
+      "required": true
+    },
+    "AWS_REGION": {
+      "description": "AWS Region",
+      "required": true
+    },
+    "AWS_ACCESS_KEY": {
+      "description": "AWS Access Key",
+      "required": true
+    },
+    "AWS_SECRET_KEY": {
+      "description": "AWS Secret Key",
+      "required": true
+    },
+    "S3_BUCKET": {
+      "description": "S3 Bucket Name",
+      "required": true
+    },
+    "S3_FILE_NAME": {
+      "description": "S3 File Name",
+      "required": true
+    },
+    "EXCLUDED_CLIENTS": {
+      "description": "Comma seperated value of non interactive clients id",
+      "requiredD": false
+    }
+  }
+}
