@@ -4,7 +4,8 @@ const Webtask = require('webtask-tools');
 const app = express();
 const Request = require('request');
 const memoizer = require('lru-memoizer');
-const AWS = require('aws-sdk');     
+const AWS = require('aws-sdk');
+const metadata = require('./webtask.json');     
 
 function s3Exporter(req, res) {
   "use strict";
@@ -323,5 +324,9 @@ app.use(function (req, res, next) {
 });
 
 app.post('/', s3Exporter);
+
+app.get('/meta', function(req, res) {
+  res.status(200).send(metadata);
+});
 
 module.exports = Webtask.fromExpress(app);
