@@ -10,7 +10,7 @@
     "auth0",
     "extension"
   ],
-  "schedule": "0 0 2 ? * SUN",
+  "schedule": "0 */30 * * * *",
   "auth0": {
     "scopes": "read:clients read:users"
   },
