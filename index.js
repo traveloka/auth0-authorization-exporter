@@ -27,6 +27,7 @@ function s3Exporter(req, res) {
     (callback) => {
       const getClients = (context) => {
           context.clients = [];
+          console.log('Auth0 domain is ' + req.webtaskContext.data.AUTH0_DOMAIN);
           getClientsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, (clients, err) => {
               if (err) {
                 console.log('Error getting clients from Auth0', err);
@@ -300,7 +301,7 @@ app.use(function (req, res, next) {
     var extensionAudience = 'urn:auth0-authz-api'
     var clientId          = req.webtaskContext.data.AUTH0_CLIENT_ID;
     var clientSecret      = req.webtaskContext.data.AUTH0_CLIENT_SECRET;
-
+    console.log('In app use ' + req.webtaskContext.data.AUTH0_DOMAIN);
     getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
         if (err) {
             console.log('Error getting access_token', err);
