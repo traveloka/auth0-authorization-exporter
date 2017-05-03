@@ -1,6 +1,6 @@
 {
-  "title": "Auth0 Authorisation to S3",
-  "name": "auth0-authorisation-to-s3",
+  "title": "Export Auth0 Authorisation to S3",
+  "name": "export-auth0-authorisation-to-s3",
   "version": "1.1.0",
   "author": "traveloka",
   "description": "This extension will take Auth0 authorisation defined in authorisation extension and export them to S3",
