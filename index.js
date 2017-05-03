@@ -49,7 +49,6 @@ function s3Exporter(req, res) {
     (context, callback) => {
         const getUsers = (context) => {
             context.users = [];
-            console.log('Auth0 domain is ' + req.webtaskContext.data.AUTH0_DOMAIN);
             getUsersFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, (users, err) => {
                 if (err) {
                     console.log('Error getting users from auth0', err);
@@ -167,7 +166,7 @@ function s3Exporter(req, res) {
 }
 
 function getClientsFromAuth0(domain, token, cb) {
-  var url = `${domain}/api/v2/clients`;
+  var url = `https://${domain}/api/v2/clients`;
 
   Request({
     method: 'GET',
@@ -191,7 +190,7 @@ function getClientsFromAuth0(domain, token, cb) {
 }
 
 function getUsersFromAuth0(domain, token, cb) {
-  var url = `${domain}/api/v2/users`;
+  var url = `https://${domain}/api/v2/users`;
 
   Request({
     method: 'GET',
@@ -296,8 +295,8 @@ const getExtensionTokenCached = memoizer({
 });
 
 app.use(function (req, res, next) {
-    var apiUrl            = `${req.webtaskContext.data.AUTH0_DOMAIN}/oauth/token`;
-    var audience          = `${req.webtaskContext.data.AUTH0_DOMAIN}/api/v2/`;
+    var apiUrl            = `https://${req.webtaskContext.data.AUTH0_DOMAIN}/oauth/token`;
+    var audience          = `https://${req.webtaskContext.data.AUTH0_DOMAIN}/api/v2/`;
     var extensionAudience = 'urn:auth0-authz-api'
     var clientId          = req.webtaskContext.data.AUTH0_CLIENT_ID;
     var clientSecret      = req.webtaskContext.data.AUTH0_CLIENT_SECRET;
