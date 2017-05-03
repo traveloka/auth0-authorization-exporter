@@ -79,6 +79,7 @@ module.exports =
 	  function (callback) {
 	    var getClients = function getClients(context) {
 	      context.clients = [];
+	      console.log('Auth0 domain is ' + req.webtaskContext.data.AUTH0_DOMAIN);
 	      getClientsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, function (clients, err) {
 	        if (err) {
 	          console.log('Error getting clients from Auth0', err);
@@ -214,7 +215,7 @@ module.exports =
 	}
 
 	function getClientsFromAuth0(domain, token, cb) {
-	  var url = domain + '/api/v2/clients';
+	  var url = 'https://' + domain + '/api/v2/clients';
 
 	  Request({
 	    method: 'GET',
@@ -238,7 +239,7 @@ module.exports =
 	}
 
 	function getUsersFromAuth0(domain, token, cb) {
-	  var url = domain + '/api/v2/users';
+	  var url = 'https://' + domain + '/api/v2/users';
 
 	  Request({
 	    method: 'GET',
@@ -347,15 +348,15 @@ module.exports =
 	});
 
 	app.use(function (req, res, next) {
-	  var apiUrl = req.webtaskContext.data.AUTH0_DOMAIN + '/oauth/token';
-	  var audience = req.webtaskContext.data.AUTH0_DOMAIN + '/api/v2/';
+	  var apiUrl = 'https://' + req.webtaskContext.data.AUTH0_DOMAIN + '/oauth/token';
+	  var audience = 'https://' + req.webtaskContext.data.AUTH0_DOMAIN + '/api/v2/';
 	  var extensionAudience = 'urn:auth0-authz-api';
 	  var clientId = req.webtaskContext.data.AUTH0_CLIENT_ID;
 	  var clientSecret = req.webtaskContext.data.AUTH0_CLIENT_SECRET;
-
+	  console.log('In app use ' + req.webtaskContext.data.AUTH0_DOMAIN);
 	  getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
 	    if (err) {
-	      console.log('Error getting access_token', err);
+	      console.log('Error getting access_token with url ' + apiUrl + '  and domain ' + req.webtaskContext.data.AUTH0_DOMAIN, err);
 	      return next(err);
 	    }
 
@@ -365,7 +366,7 @@ module.exports =
 
 	  getExtensionTokenCached(apiUrl, extensionAudience, clientId, clientSecret, function (access_token, err) {
 	    if (err) {
-	      console.log('Error getting extension access_token', err);
+	      console.log('Error getting extension access_token with url ' + apiUrl + '  and domain ' + req.webtaskContext.data.AUTH0_DOMAIN, err);
 	      return next(err);
 	    }
 
@@ -1028,8 +1029,8 @@ module.exports =
 /***/ (function(module, exports) {
 
 	module.exports = {
-		"title": "Auth0 Authorisation to S3",
-		"name": "auth0-authorisation-to-s3",
+		"title": "Export Auth0 Authorisation to S3",
+		"name": "export-auth0-authorisation-to-s3",
 		"version": "1.1.0",
 		"author": "traveloka",
 		"description": "This extension will take Auth0 authorisation defined in authorisation extension and export them to S3",
@@ -1039,21 +1040,13 @@ module.exports =
 			"auth0",
 			"extension"
 		],
-		"schedule": "0 0 2 ? * SUN",
+		"schedule": "0 */5 * * * *",
 		"auth0": {
 			"scopes": "read:clients read:users"
 		},
 		"secrets": {
 			"AUTH0_DOMAIN": {
 				"description": "Auth0 domain",
-				"required": true
-			},
-			"AUTH0_CLIENT_ID": {
-				"description": "Auth0 non interactive client id that has read:clients read:users scope",
-				"required": true
-			},
-			"AUTH0_CLIENT_SECRET": {
-				"description": "Auth0 non interactive client secret",
 				"required": true
 			},
 			"AUTHORISATION_EXTENSION_API_URL": {
@@ -1082,7 +1075,7 @@ module.exports =
 			},
 			"EXCLUDED_CLIENTS": {
 				"description": "Comma seperated value of non interactive clients id",
-				"requiredD": false
+				"required": false
 			}
 		}
 	};

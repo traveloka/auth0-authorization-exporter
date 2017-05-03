@@ -304,7 +304,7 @@ app.use(function (req, res, next) {
     console.log('In app use ' + req.webtaskContext.data.AUTH0_DOMAIN);
     getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
         if (err) {
-            console.log('Error getting access_token', err);
+            console.log(`Error getting access_token with url ${apiUrl}  and domain ${req.webtaskContext.data.AUTH0_DOMAIN}` , err);
             return next(err);
         }
 
@@ -314,7 +314,7 @@ app.use(function (req, res, next) {
 
     getExtensionTokenCached(apiUrl, extensionAudience, clientId, clientSecret, function (access_token, err) {
         if (err) {
-            console.log('Error getting extension access_token', err);
+            console.log(`Error getting extension access_token with url ${apiUrl}  and domain ${req.webtaskContext.data.AUTH0_DOMAIN}`, err);
             return next(err);
         }
 
