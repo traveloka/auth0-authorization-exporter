@@ -49,6 +49,7 @@ function s3Exporter(req, res) {
     (context, callback) => {
         const getUsers = (context) => {
             context.users = [];
+            console.log('Auth0 domain is ' + req.webtaskContext.data.AUTH0_DOMAIN);
             getUsersFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, (users, err) => {
                 if (err) {
                     console.log('Error getting users from auth0', err);

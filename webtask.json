@@ -53,7 +53,7 @@
     },
     "EXCLUDED_CLIENTS": {
       "description": "Comma seperated value of non interactive clients id",
-      "requiredD": false
+      "required": false
     }
   }
 }
