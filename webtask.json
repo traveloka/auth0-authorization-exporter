@@ -15,10 +15,6 @@
     "scopes": "read:users"
   },
   "secrets": {
-    "AUTH0_DOMAIN": {
-      "description": "Auth0 domain",
-      "required": true
-    },
     "AWS_REGION": {
       "description": "AWS Region",
       "required": true

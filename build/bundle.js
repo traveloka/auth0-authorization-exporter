@@ -57,329 +57,192 @@ module.exports =
 	var metadata = __webpack_require__(16);
 
 	function s3Exporter(req, res) {
-	  "use strict";
+	    "use strict";
 
-	  var ctx = req.webtaskContext;
+	    var ctx = req.webtaskContext;
 
-	  var required_settings = ['AUTH0_DOMAIN', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET', 'AUTHORISATION_EXTENSION_API_URL', 'AWS_REGION', 'AWS_ACCESS_KEY', 'AWS_SECRET_KEY', 'S3_BUCKET', 'S3_FILE_NAME'];
-	  var missing_settings = required_settings.filter(function (setting) {
-	    return !ctx.data[setting];
-	  });
-	  if (missing_settings.length) {
-	    return res.status(400).send({ message: 'Missing settings: ' + missing_settings.join(', ') });
-	  }
-
-	  var excludedClients = [];
-	  if (ctx.data.EXCLUDED_CLIENTS) {
-	    excludedClients = ctx.data.EXCLUDED_CLIENTS.split(",");
-	  }
-
-	  async.waterfall([
-	  // get all available clients      
-	  function (callback) {
-	    var getClients = function getClients(context) {
-	      context.clients = [];
-	      console.log('Auth0 domain is ' + req.webtaskContext.data.AUTH0_DOMAIN);
-	      getClientsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, function (clients, err) {
-	        if (err) {
-	          console.log('Error getting clients from Auth0', err);
-	          return callback(err);
-	        }
-	        if (clients && clients.length) {
-	          clients.filter(function (client) {
-	            return excludedClients.indexOf(client.client_id) < 0;
-	          }).forEach(function (client) {
-	            return context.clients.push(client);
-	          });
-	        }
-
-	        console.log('Total clients: ' + context.clients.length + '.');
-	        return callback(null, context);
-	      });
-	    };
-
-	    getClients({});
-	  },
-	  // get all users
-	  function (context, callback) {
-	    var getUsers = function getUsers(context) {
-	      context.users = [];
-	      getUsersFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, function (users, err) {
-	        if (err) {
-	          console.log('Error getting users from auth0', err);
-	          return callback(err);
-	        }
-
-	        if (users && users.length) {
-	          users.forEach(function (user) {
-	            return context.users.push(user);
-	          });
-	        }
-
-	        console.log('Total user is ' + context.users.length);
-	        return callback(null, context);
-	      });
-	    };
-
-	    if (context.clients.length > 0) {
-	      getUsers(context);
-	    } else {
-	      callback(null, context);
-	    }
-	  },
-	  // get user permission for every client
-	  function (context, callback) {
-	    var userPermissions = [];
-	    var allPromises = [];
-	    if (context.clients && context.users) {
-	      for (var i = 0; i < context.clients.length; i++) {
-	        for (var j = 0; j < context.users.length; j++) {
-	          allPromises.push(getUserPolicy(req.webtaskContext.data.AUTHORISATION_EXTENSION_API_URL, context.users[j].user_id, context.users[j].email, context.clients[i].client_id, req.extension_access_token));
-	        }
-	      }
-	    }
-
-	    if (allPromises.length > 0) {
-	      Promise.all(allPromises).then(function (values) {
-	        var mapper = {};
-	        values.filter(function (element) {
-	          return element.permissions.length > 0;
-	        }).forEach(function (element) {
-	          var content = mapper[element.client_id];
-	          if (content) {
-	            content.user_permissions.push({ username: element.email, permissions: element.permissions });
-	            mapper[element.client_id] = content;
-	          } else {
-	            content = {};
-	            content.client_id = element.client_id;
-	            content.user_permissions = [];
-	            content.user_permissions.push({ username: element.email, permissions: element.permissions });
-	            mapper[element.client_id] = content;
-	          }
-	        });
-
-	        var result = [];
-	        for (var key in mapper) {
-	          if (mapper.hasOwnProperty(key)) {
-	            result.push(mapper[key]);
-	          }
-	        }
-
-	        context.user_permissions = result;
-	        callback(null, context);
-	      }).catch(function (reason) {
-	        console.log(reason);
-	        callback(reason, context);
-	      });
-	    } else {
-	      callback(null, context);
-	    }
-	  },
-	  // send user permissions to s3
-	  function (context, callback) {
-	    console.log('User permissions is ' + JSON.stringify(context.user_permissions));
-	    if (context.user_permissions && context.user_permissions.length > 0) {
-	      var s3 = new AWS.S3({
-	        region: req.webtaskContext.data.AWS_REGION,
-	        accessKeyId: req.webtaskContext.data.AWS_ACCESS_KEY,
-	        secretAccessKey: req.webtaskContext.data.AWS_SECRET_KEY
-	      });
-	      var maxAge = 60 * 60 * 24 * 365;
-	      var cacheControl = 'public, max-age=' + maxAge;
-	      var awsConfig = {
-	        Bucket: req.webtaskContext.data.S3_BUCKET,
-	        ACL: 'public-read',
-	        CacheControl: cacheControl,
-	        Key: req.webtaskContext.data.S3_FILE_NAME,
-	        Body: JSON.stringify(context.user_permissions)
-	      };
-
-	      s3.putObject(awsConfig, function (err, data) {
-	        if (err) throw err;
-	        callback(null, context);
-	      });
-	    } else {
-	      callback(null, context);
-	    }
-	  }], function (err, context) {
-	    if (err) {
-	      console.log('Job failed.');
-	      res.status(500).send({
-	        error: err
-	      });
-	    }
-
-	    console.log('Job complete.');
-	    res.sendStatus(200);
-	  });
-	}
-
-	function getClientsFromAuth0(domain, token, cb) {
-	  var url = 'https://' + domain + '/api/v2/clients';
-
-	  Request({
-	    method: 'GET',
-	    url: url,
-	    json: true,
-	    headers: {
-	      Authorization: 'Bearer ' + token,
-	      Accept: 'application/json'
-	    },
-	    qs: {
-	      fields: 'client_id'
-	    }
-	  }, function (err, res, body) {
-	    if (err) {
-	      console.log('Error getting clients', err);
-	      cb(null, err);
-	    } else {
-	      cb(body);
-	    }
-	  });
-	}
-
-	function getUsersFromAuth0(domain, token, cb) {
-	  var url = 'https://' + domain + '/api/v2/users';
-
-	  Request({
-	    method: 'GET',
-	    url: url,
-	    json: true,
-	    qs: {
-	      fields: 'name,email,user_id',
-	      q: 'email:@traveloka.com',
-	      search_engine: 'v2'
-	    },
-	    headers: {
-	      Authorization: 'Bearer ' + token,
-	      Accept: 'application/json'
-	    }
-	  }, function (err, res, body) {
-	    if (err) {
-	      console.log('Error getting users', err);
-	      cb(null, err);
-	    } else {
-	      cb(body);
-	    }
-	  });
-	}
-
-	function getUserPolicy(domain, user_id, email, client_id, token) {
-	  return new Promise(function (resolve, reject) {
-	    var url = domain + '/users/' + user_id + '/policy/' + client_id;
-	    Request({
-	      method: 'POST',
-	      url: url,
-	      json: true,
-	      headers: {
-	        Authorization: 'Bearer ' + token,
-	        Accept: 'application/json'
-	      },
-	      body: {
-	        connectionName: "Y"
-	      }
-	    }, function (err, res, body) {
-	      if (err) {
-	        console.log('Error getting user policy', err);
-	        reject(Error(err));
-	      } else {
-	        var userPermission = {};
-	        userPermission.client_id = client_id;
-	        userPermission.email = email;
-	        userPermission.permissions = body.permissions;
-	        resolve(userPermission);
-	      }
+	    var required_settings = ['AUTH0_DOMAIN', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET', 'AWS_REGION', 'AWS_ACCESS_KEY', 'AWS_SECRET_KEY', 'S3_BUCKET', 'S3_FILE_NAME'];
+	    var missing_settings = required_settings.filter(function (setting) {
+	        return !ctx.data[setting];
 	    });
-	  });
+	    if (missing_settings.length) {
+	        return res.status(400).send({ message: 'Missing settings: ' + missing_settings.join(', ') });
+	    }
+
+	    var excludedClients = [];
+	    if (ctx.data.EXCLUDED_CLIENTS) {
+	        excludedClients = ctx.data.EXCLUDED_CLIENTS.split(",");
+	    }
+
+	    async.waterfall([
+	    // get all users 
+	    function (callback) {
+	        var allUser = function allUser(context) {
+	            getAllUsers(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, 0, 100, [], function (err, users) {
+	                if (err) {
+	                    console.log('Error ' + err);
+	                    res.sendStatus(500);
+	                }
+
+	                console.log('No of user ' + users.length);
+	                var clientUserPermissionMapper = {};
+	                users.forEach(function (user) {
+	                    if (user.app_metadata && user.app_metadata.authorization) {
+	                        //console.log('App metadata authorisation is ' + JSON.stringify(user.app_metadata.authorization));
+	                        user.app_metadata.authorization.forEach(function (userPermission) {
+	                            if (userPermission.permissions && userPermission.permissions.length > 0) {
+	                                var clientUserPermissionContent = clientUserPermissionMapper[userPermission.clientID] || {};
+	                                clientUserPermissionContent.client_id = userPermission.clientID;
+	                                var userPermissionList = clientUserPermissionContent.user_permissions || [];
+	                                userPermissionList.push({ username: user.email, permissions: userPermission.permissions });
+	                                clientUserPermissionContent.user_permissions = userPermissionList;
+	                                clientUserPermissionMapper[userPermission.clientID] = clientUserPermissionContent;
+	                            }
+	                        });
+	                    }
+	                });
+
+	                var result = [];
+	                for (var key in clientUserPermissionMapper) {
+	                    if (clientUserPermissionMapper.hasOwnProperty(key)) {
+	                        result.push(clientUserPermissionMapper[key]);
+	                    }
+	                }
+	                context.user_permissions = result;
+
+	                return callback(null, context);
+	            });
+	        };
+	        allUser({});
+	    },
+	    // send user permissions to s3
+	    function (context, callback) {
+	        console.log('User permissions is ' + JSON.stringify(context.user_permissions));
+	        if (context.user_permissions && context.user_permissions.length > 0) {
+	            var s3 = new AWS.S3({
+	                region: req.webtaskContext.data.AWS_REGION,
+	                accessKeyId: req.webtaskContext.data.AWS_ACCESS_KEY,
+	                secretAccessKey: req.webtaskContext.data.AWS_SECRET_KEY
+	            });
+	            var maxAge = 60 * 60 * 24 * 365;
+	            var cacheControl = 'public, max-age=' + maxAge;
+	            var awsConfig = {
+	                Bucket: req.webtaskContext.data.S3_BUCKET,
+	                ACL: 'private',
+	                CacheControl: cacheControl,
+	                Key: req.webtaskContext.data.S3_FILE_NAME,
+	                Body: JSON.stringify(context.user_permissions)
+	            };
+
+	            s3.putObject(awsConfig, function (err, data) {
+	                if (err) throw err;
+	                callback(null, context);
+	            });
+	        } else {
+	            callback(null, context);
+	        }
+	    }], function (err, context) {
+	        if (err) {
+	            console.log('Job failed.');
+	            res.status(500).send({
+	                error: err
+	            });
+	        }
+
+	        console.log('Job complete.');
+	        res.sendStatus(200);
+	    });
+	}
+
+	function getAllUsers(domain, token, page, pageSize, users, callback) {
+	    getUsers(domain, token, page, pageSize).then(function (result) {
+	        if (result.length === pageSize) {
+	            getAllUsers(domain, token, page + 1, pageSize, users.concat(result), callback);
+	        } else {
+	            callback(null, users);
+	        }
+	    }).catch(function (error) {
+	        console.log('Error ' + error);
+	        callback(null);
+	    });
+	}
+
+	function getUsers(domain, token, page, pageSize) {
+	    return new Promise(function (resolve, reject) {
+	        var url = 'https://' + domain + '/api/v2/users';
+	        Request({
+	            method: 'GET',
+	            url: url,
+	            json: true,
+	            qs: {
+	                fields: 'name,email,user_id,app_metadata',
+	                page: page,
+	                per_page: pageSize,
+	                q: 'email:@traveloka.com',
+	                search_engine: 'v2'
+	            },
+	            headers: {
+	                Authorization: 'Bearer ' + token,
+	                Accept: 'application/json'
+	            }
+	        }, function (err, res, body) {
+	            if (err) {
+	                reject(Error(err));
+	            } else {
+	                resolve(body);
+	            }
+	        });
+	    });
 	}
 
 	var getTokenCached = memoizer({
-	  load: function load(apiUrl, audience, clientId, clientSecret, cb) {
-	    Request({
-	      method: 'POST',
-	      url: apiUrl,
-	      json: true,
-	      body: {
-	        audience: audience,
-	        grant_type: 'client_credentials',
-	        client_id: clientId,
-	        client_secret: clientSecret
-	      }
-	    }, function (err, res, body) {
-	      if (err) {
-	        cb(null, err);
-	      } else {
-	        cb(body.access_token);
-	      }
-	    });
-	  },
-	  hash: function hash(apiUrl) {
-	    return apiUrl;
-	  },
-	  max: 100,
-	  maxAge: 1000 * 60 * 60
-	});
-
-	var getExtensionTokenCached = memoizer({
-	  load: function load(apiUrl, audience, clientId, clientSecret, cb) {
-	    Request({
-	      method: 'POST',
-	      url: apiUrl,
-	      json: true,
-	      body: {
-	        audience: audience,
-	        grant_type: 'client_credentials',
-	        client_id: clientId,
-	        client_secret: clientSecret
-	      }
-	    }, function (err, res, body) {
-	      if (err) {
-	        cb(null, err);
-	      } else {
-	        cb(body.access_token);
-	      }
-	    });
-	  },
-	  hash: function hash(apiUrl) {
-	    return apiUrl;
-	  },
-	  max: 100,
-	  maxAge: 1000 * 60 * 60
+	    load: function load(apiUrl, audience, clientId, clientSecret, cb) {
+	        Request({
+	            method: 'POST',
+	            url: apiUrl,
+	            json: true,
+	            body: {
+	                audience: audience,
+	                grant_type: 'client_credentials',
+	                client_id: clientId,
+	                client_secret: clientSecret
+	            }
+	        }, function (err, res, body) {
+	            if (err) {
+	                cb(null, err);
+	            } else {
+	                cb(body.access_token);
+	            }
+	        });
+	    },
+	    hash: function hash(apiUrl) {
+	        return apiUrl;
+	    },
+	    max: 100,
+	    maxAge: 1000 * 60 * 60
 	});
 
 	app.use(function (req, res, next) {
-	  var apiUrl = 'https://' + req.webtaskContext.data.AUTH0_DOMAIN + '/oauth/token';
-	  var audience = 'https://' + req.webtaskContext.data.AUTH0_DOMAIN + '/api/v2/';
-	  var extensionAudience = 'urn:auth0-authz-api';
-	  var clientId = req.webtaskContext.data.AUTH0_CLIENT_ID;
-	  var clientSecret = req.webtaskContext.data.AUTH0_CLIENT_SECRET;
-	  console.log('In app use ' + req.webtaskContext.data.AUTH0_DOMAIN);
-	  getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
-	    if (err) {
-	      console.log('Error getting access_token with url ' + apiUrl + '  and domain ' + req.webtaskContext.data.AUTH0_DOMAIN, err);
-	      return next(err);
-	    }
+	    var apiUrl = 'https://' + req.webtaskContext.data.AUTH0_DOMAIN + '/oauth/token';
+	    var audience = 'https://' + req.webtaskContext.data.AUTH0_DOMAIN + '/api/v2/';
+	    var clientId = req.webtaskContext.data.AUTH0_CLIENT_ID;
+	    var clientSecret = req.webtaskContext.data.AUTH0_CLIENT_SECRET;
 
-	    req.access_token = access_token;
-	    next();
-	  });
+	    getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
+	        if (err) {
+	            console.log('Error getting access_token with url ' + apiUrl + '  and domain ' + req.webtaskContext.data.AUTH0_DOMAIN, err);
+	            return next(err);
+	        }
 
-	  getExtensionTokenCached(apiUrl, extensionAudience, clientId, clientSecret, function (access_token, err) {
-	    if (err) {
-	      console.log('Error getting extension access_token with url ' + apiUrl + '  and domain ' + req.webtaskContext.data.AUTH0_DOMAIN, err);
-	      return next(err);
-	    }
-
-	    req.extension_access_token = access_token;
-	    // not sure this has to be remarked
-	    //next();
-	  });
+	        req.access_token = access_token;
+	        next();
+	    });
 	});
 
-	app.post('/', s3Exporter);
+	app.get('/', s3Exporter);
 
 	app.get('/meta', function (req, res) {
-	  res.status(200).send(metadata);
+	    res.status(200).send(metadata);
 	});
 
 	module.exports = Webtask.fromExpress(app);
@@ -1031,7 +894,7 @@ module.exports =
 	module.exports = {
 		"title": "Export Auth0 Authorisation to S3",
 		"name": "export-auth0-authorisation-to-s3",
-		"version": "1.1.0",
+		"version": "1.2.0",
 		"author": "traveloka",
 		"description": "This extension will take Auth0 authorisation defined in authorisation extension and export them to S3",
 		"type": "cron",
@@ -1040,19 +903,11 @@ module.exports =
 			"auth0",
 			"extension"
 		],
-		"schedule": "0 */5 * * * *",
+		"schedule": "0 */10 * * * *",
 		"auth0": {
-			"scopes": "read:clients read:users"
+			"scopes": "read:users"
 		},
 		"secrets": {
-			"AUTH0_DOMAIN": {
-				"description": "Auth0 domain",
-				"required": true
-			},
-			"AUTHORISATION_EXTENSION_API_URL": {
-				"description": "Auth0 authorisation extension API",
-				"required": true
-			},
 			"AWS_REGION": {
 				"description": "AWS Region",
 				"required": true
@@ -1072,10 +927,6 @@ module.exports =
 			"S3_FILE_NAME": {
 				"description": "S3 File Name",
 				"required": true
-			},
-			"EXCLUDED_CLIENTS": {
-				"description": "Comma seperated value of non interactive clients id",
-				"required": false
 			}
 		}
 	};
