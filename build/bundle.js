@@ -57,8 +57,6 @@ module.exports =
 	var metadata = __webpack_require__(16);
 
 	function s3Exporter(req, res) {
-	    "use strict";
-
 	    var ctx = req.webtaskContext;
 
 	    var required_settings = ['AUTH0_DOMAIN', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET', 'AWS_REGION', 'AWS_ACCESS_KEY', 'AWS_SECRET_KEY', 'S3_BUCKET', 'S3_FILE_NAME'];
@@ -84,11 +82,9 @@ module.exports =
 	                    res.sendStatus(500);
 	                }
 
-	                console.log('No of user ' + users.length);
 	                var clientUserPermissionMapper = {};
 	                users.forEach(function (user) {
 	                    if (user.app_metadata && user.app_metadata.authorization) {
-	                        //console.log('App metadata authorisation is ' + JSON.stringify(user.app_metadata.authorization));
 	                        user.app_metadata.authorization.forEach(function (userPermission) {
 	                            if (userPermission.permissions && userPermission.permissions.length > 0) {
 	                                var clientUserPermissionContent = clientUserPermissionMapper[userPermission.clientID] || {};
@@ -117,7 +113,6 @@ module.exports =
 	    },
 	    // send user permissions to s3
 	    function (context, callback) {
-	        console.log('User permissions is ' + JSON.stringify(context.user_permissions));
 	        if (context.user_permissions && context.user_permissions.length > 0) {
 	            var s3 = new AWS.S3({
 	                region: req.webtaskContext.data.AWS_REGION,
@@ -149,7 +144,7 @@ module.exports =
 	            });
 	        }
 
-	        console.log('Job complete.');
+	        console.log('Authorisation export has been completed.');
 	        res.sendStatus(200);
 	    });
 	}
@@ -240,6 +235,7 @@ module.exports =
 	});
 
 	app.get('/', s3Exporter);
+	app.post('/', s3Exporter);
 
 	app.get('/meta', function (req, res) {
 	    res.status(200).send(metadata);
