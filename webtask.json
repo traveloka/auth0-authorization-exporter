@@ -1,7 +1,7 @@
 {
   "title": "Export Auth0 Authorisation to S3",
   "name": "export-auth0-authorisation-to-s3",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "traveloka",
   "description": "This extension will take Auth0 authorisation defined in authorisation extension and export them to S3",
   "type": "cron",
@@ -10,17 +10,13 @@
     "auth0",
     "extension"
   ],
-  "schedule": "0 */5 * * * *",
+  "schedule": "0 */10 * * * *",
   "auth0": {
-    "scopes": "read:clients read:users"
+    "scopes": "read:users"
   },
   "secrets": {
     "AUTH0_DOMAIN": {
       "description": "Auth0 domain",
-      "required": true
-    },
-    "AUTHORISATION_EXTENSION_API_URL": {
-      "description": "Auth0 authorisation extension API",
       "required": true
     },
     "AWS_REGION": {
@@ -42,10 +38,6 @@
     "S3_FILE_NAME": {
       "description": "S3 File Name",
       "required": true
-    },
-    "EXCLUDED_CLIENTS": {
-      "description": "Comma seperated value of non interactive clients id",
-      "required": false
     }
   }
 }
